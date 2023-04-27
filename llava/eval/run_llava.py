@@ -48,18 +48,14 @@ def load_image(image_file):
     return image
 
 
-def load_model(args):
+def eval_model(args):
     # Model
     disable_torch_init()
     model_name = os.path.expanduser(args.model_name)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     if args.mm_projector is None:
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name, torch_dtype=torch.float16, device_map="auto"
-        )
-        image_processor = CLIPImageProcessor.from_pretrained(
-            model.config.mm_vision_tower, torch_dtype=torch.float16
-        )
+        model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16).cuda()
+        image_processor = CLIPImageProcessor.from_pretrained(model.config.mm_vision_tower, torch_dtype=torch.float16)
 
         mm_use_im_start_end = getattr(model.config, "mm_use_im_start_end", False)
         tokenizer.add_tokens([DEFAULT_IMAGE_PATCH_TOKEN], special_tokens=True)
@@ -100,13 +96,6 @@ def load_model(args):
 
         model.model.mm_projector = mm_projector.cuda().half()
         model.model.vision_tower = [vision_tower]
-
-    return model, tokenizer, image_processor, image_token_len
-
-
-def eval_model(args):
-    model, tokenizer, image_processor, image_token_len = load_model(args)
-    mm_use_im_start_end = getattr(model.config, "mm_use_im_start_end", False)
 
     qs = args.query
     if mm_use_im_start_end:
@@ -159,7 +148,6 @@ def eval_model(args):
 
     outputs = outputs[:index].strip()
     print(outputs)
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
